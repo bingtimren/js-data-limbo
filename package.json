@@ -1,0 +1,29 @@
+{
+  "name": "data-limbo",
+  "version": "0.1.0",
+  "description": "A data middleman serve Proxy between user (a UI component) and a data source (Vuex store, or just an object), retain and validate data before committing the changes to the data store",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha --reporter spec"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bingtimren/js-data-limbo.git"
+  },
+  "keywords": [
+    "data",
+    "proxy",
+    "middleman",
+    "vuex"
+  ],
+  "author": "Bing Ren",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bingtimren/js-data-limbo/issues"
+  },
+  "homepage": "https://github.com/bingtimren/js-data-limbo#readme",
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "mocha": "^5.2.0"
+  }
+}
