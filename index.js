@@ -15,112 +15,190 @@
 
 const DIRTY = 'DIRTY'
 const NEW = 'NEW'
+const RETAINED = 'RETAINED'
+const DELETED = 'DELETED'
 
+/**
+ * Proxy handler class, attach a new instance for each target
+ */
 class MiddlemanHandler {
     constructor(target) {
-        this.__keyMap = {}
-        this.__statMap = {}
-        this.__target = target
+        this.keyMap = {} // { keyOfAProperty: {value:valueOfProperty,state:STATE,validator:(value)=>{}}}
+        this.target = target
     }
+
+    assertAttachment(target) {
+        if (target !== this.target) {
+            throw TypeError("ERROR: MiddlemanHandler can only be used to its target!")
+        }
+    }
+
+    commit() {
+        // make sure this is called in the context of the proxy
+        if (!(this.$isProxy)) {
+            throw TypeError("commit() should be called in the context of Proxy")
+        }
+        const keyMap = this.$proxyKeyMap
+        const target = this.$proxyTarget
+
+        // commit changes to the target
+        for (var key in keyMap) {
+            const retained = keyMap[key]
+            const state = retained.state
+            const value = retained.value
+            switch (state) {
+                case RETAINED:
+                    if (value && value.$isProxy) {
+                        value.$commit()
+                    }
+                    break // nothing to do
+                case DELETED:
+                    Reflect.deleteProperty(target, key)
+                    break
+                case DIRTY:
+                case NEW:
+                    
+                    if (value && value.$isProxy) {
+                        // first commit the proxy property's changes as well
+                        value.$commit()
+                        Reflect.set(target, key, value.$proxyTarget)
+                    } else {
+                        Reflect.set(target, key, value)
+                    }
+
+            }
+        }
+    }
+
     get(target, key, context) {
         // this would be the handler instance
         // target would be a store module or state, or anything
         // key would be a string or Symbol
         // context would be the Proxy
-        if (target !== this.__target) {
-            throw "ERROR: MiddlemanHandler can only be used to its target!"
-        }
-        // first some markers
-        if (key === '__isProxy') {
+        this.assertAttachment(target)
+        // return the proxy's own properties
+        if (key === '$isProxy') {
             return true
         }
-        if (key === '__proxyKeyMap') {
-            return this.__keyMap
+        if (key === '$proxyKeyMap') {
+            return this.keyMap
         }
-        if (key === '__proxyTarget') {
-            return this.__target
+        if (key === '$proxyTarget') {
+            return this.target
         }
-        if (key === '__proxyStateMap') {
-            return this.__statMap
+        if (key === '$commit') {
+            return this.commit
         }
 
         // first to check if a copy/proxy of the property is already retained
-        const retainedProp = this.__keyMap[key]
+        const retainedProp = this.keyMap[key]
         if (retainedProp !== undefined) {
-            // exists a retained copy/proxy, simply return it
-            return retainedProp
+            // exists a retained property, return the value. 
+            // no worries here, if property is DELETED, value would be undefined
+            return retainedProp.value
         } else {
-            // now check if an value exists at target
-            const targetProp = Reflect.get(...arguments)
-            // if key not defined at target, just return undefined
-            if (targetProp === undefined) {
+            // no knowledge of this property, check from the target
+            let retained = Reflect.get(...arguments)
+            // if key not defined at target, just return undefined, so to be consistent with ordinary object
+            if (retained === undefined) {
                 return undefined
             }
-            if (typeof targetProp !== "object" || targetProp === null) {
-                // retain a copy and return
-                this.__keyMap[key] = targetProp
-                return targetProp
+            if (typeof retained === "object" && retained !== null) {
+                retained = Middleman(retained)
             }
-            // retain a proxy and return
-            const proxiedTargetPropObj = Middleman(targetProp)
-            this.__keyMap[key] = proxiedTargetPropObj
-            return proxiedTargetPropObj
+            // also retain a copy of the property descriptor
+            const descriptor = Reflect.getOwnPropertyDescriptor(target, key)
+            if (descriptor) {
+                delete descriptor.value
+            }
+            // retain in keyMap
+            this.keyMap[key] = {
+                value: retained,
+                state: RETAINED,
+                descriptor: descriptor
+
+            }
+            return retained
         }
     }
 
     set(target, key, value) {
-        if (target !== this.__target) {
-            throw "ERROR: MiddlemanHandler can only be used to its target!"
+        this.assertAttachment(target)
+        let retained = (typeof value !== "object" || value === null) ? value : Middleman(value)
+        let state = (key in this.keyMap || key in target) ? DIRTY : NEW
+        this.keyMap[key] = {
+            value: retained,
+            state: state,
+            descriptor: {
+                configurable: true,
+                enumerable: true,
+                writable: true
+            }
         }
-        var retained
-        if (typeof value !== "object" || value === null) {
-            // retain and set dirty
-            retained = value
+        return true
+    }
+
+    deleteProperty(target, key) {
+        // if cannot delete target property, cannot delete middleman property
+        const tDesc = Object.getOwnPropertyDescriptor(target, key)
+        if (tDesc !== undefined) { // found the property in target
+            if (tDesc.configurable === false) {
+                throw TypeError("Cannot delete non-configurable own property")
+            }
+            // else ok to delete
         } else {
-            retained = Middleman(value)
+            // not found in target, was it ever there?
+            if (!(key in this.keyMap)) {
+                // it was neither here or in target, return false
+                return false
+            }
         }
-        var state
-        if (key in target) {
-            state = DIRTY
-        } else {
-            state = NEW
+        // mark deleted without actually delete
+        this.keyMap[key] = {
+            state: DELETED,
+            value: undefined
         }
-        this.__keyMap[key] = retained
-        this.__statMap[key] = state
+        return true
+
     }
 
     ownKeys(target) {
-        if (target !== this.__target) {
-            throw "ERROR: MiddlemanHandler can only be used to its target!"
-        }
-        const ownKeys = Reflect.ownKeys(target)
-        // add new keys
-        for (var key in this.__statMap) {
-            if (this.__statMap[key] === NEW) {
-                ownKeys.push(key)
+        this.assertAttachment(target)
+        // target's keys are all middleman's keys unless deleted
+        const targetKeys = Reflect.ownKeys(target)
+        const res = []
+        for (var i = 0; i < targetKeys.length; i++) {
+            const key = targetKeys[i]
+            const retained = this.keyMap[key]
+            if (!(retained && retained.state === DELETED)) {
+                res.push(key)
             }
         }
-        return ownKeys
+        // add new keys
+        for (var key in this.keyMap) {
+            if (this.keyMap[key].state === NEW && (!(key in target))) {
+                res.push(key)
+            }
+        }
+        return res
 
     }
 
     has(target, key) {
-        if (target !== this.__target) {
-            throw "ERROR: MiddlemanHandler can only be used to its target!"
+        this.assertAttachment(target)
+        const retainedProp = this.keyMap[key]
+        if (retainedProp === undefined) {
+            // no knowledge, check target
+            return Reflect.has(...arguments)
         }
-        if (key in target) {
-            return true
-        }
-        return this.__statMap[key] === NEW || this.__statMap[key] === DIRTY
+        return (retainedProp.state !== DELETED)
     }
 
     getOwnPropertyDescriptor(target, key) {
-        if (this.__statMap[key] === NEW) {
-            return {
-                configurable: true,
-                enumerable: true,
-                value: this.__keyMap[key]
-            }
+        this.assertAttachment(target)
+        const retainedProp = this.keyMap[key]
+        if (retainedProp && retainedProp.state !== DELETED) {
+            return retainedProp.descriptor
         }
         return Reflect.getOwnPropertyDescriptor(...arguments)
 
