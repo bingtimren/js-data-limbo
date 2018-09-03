@@ -39,8 +39,8 @@ class MiddlemanHandler {
         }
         this.keyMap = {} // key : property's Proxy
         this.value = value
-        this.proxy = (typeof value==='object' && value !== null)?
-            new Proxy(value, this):undefined
+        this.proxy = (typeof value === 'object' && value !== null) ?
+            new Proxy(value, this) : undefined
 
         this.parentHandler = parentHandler // parent
         this.propertyName = propertyName
@@ -75,8 +75,8 @@ class MiddlemanHandler {
         }
     }
 
-    valueOrProxy(){
-        return this.proxy===undefined?this.value:this.proxy
+    valueOrProxy() {
+        return this.proxy === undefined ? this.value : this.proxy
     }
 
     assertAttachment(target) {
@@ -129,14 +129,28 @@ class MiddlemanHandler {
             case '$principal':
                 return this.value
             case '$commit':
-                return ()=>{this.commit()}
+                return () => {
+                    this.commit()
+                }
             case '$propertyState':
-                return this.propertyState
+                return function (thisHandler) {
+                    return (propertyName) => {
+                        const targetProp =
+                            propertyName ?
+                            thisHandler.getOrRetainProperty(propertyName) :
+                            thisHandler
+                        return targetProp ?
+                            targetProp.propertyState : undefined
+                    }
+                }(this)
             case '$changed':
+                if (typeof target !== 'object' || target === null) {
+                    throw TypeError("$changed is only meaningful for a not-null object.")
+                }
                 return this.changed
             default:
                 const retained = this.getOrRetainProperty(key)
-                return retained === undefined?undefined:retained.valueOrProxy()
+                return retained === undefined ? undefined : retained.valueOrProxy()
         }
     }
 
@@ -159,7 +173,7 @@ class MiddlemanHandler {
      */
     setChanged() {
         this.changed = true
-        if (this.parentHandler!==undefined){
+        if (this.parentHandler !== undefined) {
             this.parentHandler.setChanged()
         }
     }
@@ -228,7 +242,7 @@ class MiddlemanHandler {
 }
 
 function middleman(value, parentHandler, propertyName, propertyState, propertyDescriptor) {
-    if (typeof(value)!=='object') {
+    if (typeof (value) !== 'object') {
         throw TypeError("Cannot create Middleman for a non-object value, Middleman is a Proxy.")
     }
     const handler = new MiddlemanHandler(value, parentHandler, propertyName, propertyState, propertyDescriptor)
@@ -237,5 +251,10 @@ function middleman(value, parentHandler, propertyName, propertyState, propertyDe
 
 module.exports = {
     middleman: middleman,
-    MiddlemanHandler: MiddlemanHandler
+    MiddlemanHandler: MiddlemanHandler,
+    DIRTY: DIRTY,
+    RETAINED: RETAINED,
+    NEW: NEW,
+    DELETED,
+    DELETED
 }

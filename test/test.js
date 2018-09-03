@@ -3,6 +3,10 @@
 const expect = require('chai').expect
 const DataLimbo = require('../index')
 const middleman = DataLimbo.middleman
+const NEW = DataLimbo.NEW
+const DELETED = DataLimbo.DELETED
+const RETAINED = DataLimbo.RETAINED
+const DIRTY = DataLimbo.DIRTY
 
 describe("Function middleman", function () {
     var target // an ordinary object
@@ -26,12 +30,28 @@ describe("Function middleman", function () {
         expect(midMan.$isProxy).true
         expect(midMan.$principal).to.equal(target)
         expect(typeof midMan.$proxyKeyMap).to.equal("object")
+        expect(midMan.$propertyState()===RETAINED)
+        expect(midMan.o.$propertyState()===RETAINED)
+        expect(midMan.$propertyState('a')===RETAINED)
+        expect(midMan.$changed).false
     })
     it("Middleman should look the same as target", function(){
         expect(JSON.stringify(midMan)).to.equal(targetBeforeChange)
     })
     it("Middleman should work like target but not changing target before commit", function(){
         makeSomeChanges(midMan)
+        expect(midMan.$changed).true
+        expect(midMan.o.$changed).true
+        expect(midMan.$propertyState('a')).to.equal(DIRTY)
+        expect(midMan.$propertyState('x')).to.equal(NEW)
+        expect(midMan.x.$propertyState()).to.equal(NEW)
+        expect(midMan.$propertyState('y')).to.equal(NEW)
+        expect(midMan.y.$propertyState()).to.equal(NEW)
+        expect(midMan.o.$propertyState()).to.equal(RETAINED)
+        expect(midMan.$propertyState('o')).to.equal(RETAINED)
+        expect(midMan.$propertyState('toDelete')).to.equal(DELETED)
+        expect(midMan.o.$propertyState('useless')).to.equal(DELETED)
+        
         expect(JSON.stringify(midMan)).not.equal(JSON.stringify(target))
         expect(JSON.stringify(target)).to.equal(targetBeforeChange)
         makeSomeChanges(target)
