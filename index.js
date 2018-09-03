@@ -257,10 +257,8 @@ function middleman(value, parentHandler, propertyName, propertyState, propertyDe
 
 module.exports = {
     middleman: middleman,
-    MiddlemanHandler: MiddlemanHandler,
-    DIRTY: DIRTY,
-    RETAINED: RETAINED,
-    NEW: NEW,
-    DELETED,
+    DIRTY,
+    RETAINED,
+    NEW,
     DELETED
 }
