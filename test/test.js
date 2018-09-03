@@ -7,6 +7,7 @@ const NEW = DataLimbo.NEW
 const DELETED = DataLimbo.DELETED
 const RETAINED = DataLimbo.RETAINED
 const DIRTY = DataLimbo.DIRTY
+const _ = require('lodash')
 
 describe("Function middleman", function () {
     var target // an ordinary object
@@ -37,6 +38,7 @@ describe("Function middleman", function () {
     })
     it("Middleman should look the same as target", function(){
         expect(JSON.stringify(midMan)).to.equal(targetBeforeChange)
+        expect(_.isEqual(midMan, target)).true
     })
     it("Middleman should work like target but not changing target before commit", function(){
         makeSomeChanges(midMan)
@@ -51,11 +53,11 @@ describe("Function middleman", function () {
         expect(midMan.$propertyState('o')).to.equal(RETAINED)
         expect(midMan.$propertyState('toDelete')).to.equal(DELETED)
         expect(midMan.o.$propertyState('useless')).to.equal(DELETED)
-        
         expect(JSON.stringify(midMan)).not.equal(JSON.stringify(target))
         expect(JSON.stringify(target)).to.equal(targetBeforeChange)
-        makeSomeChanges(target)
+        makeSomeChanges(target) // make the same changes
         expect(JSON.stringify(midMan)).to.equal(JSON.stringify(target))
+        expect(_.isEqual(midMan, target)).true
     })
     it("Changes should be correctly reflected to target after commit", function(){
         makeSomeChanges(midMan)
@@ -63,5 +65,6 @@ describe("Function middleman", function () {
         midMan.$commit()
         const targetJSON = JSON.stringify(target)
         expect(targetJSON).to.equal(midManJSON)
+        expect(_.isEqual(midMan, target)).true
     })
 })

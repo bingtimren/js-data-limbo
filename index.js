@@ -90,15 +90,17 @@ class MiddlemanHandler {
      * @param {string} key 
      */
     getOrRetainProperty(key) {
-        const retainedProp = this.keyMap[key] // would be a proxy
+        const retainedProp = 
+            this.keyMap.hasOwnProperty(key)?this.keyMap[key]:undefined // would be a proxy
         if (retainedProp !== undefined) {
             return retainedProp
         }
         // no knowledge of this property, check from the value
-        let retained = this.value[key]
+        let retained = 
+            this.value.hasOwnProperty(key)?this.value[key]:undefined
         // if property does not exist, return undefined
         if (retained === undefined) {
-            return undefined
+            return undefined // has no own key
         }
         // obtain a descriptor
         const descriptor = Reflect.getOwnPropertyDescriptor(this.value, key)
@@ -149,8 +151,12 @@ class MiddlemanHandler {
                 }
                 return this.changed
             default:
+                // get or retain a MiddlemanHandler if key is target's own key
+                // otherwise fallback since there still might be result from
+                // a prototype
                 const retained = this.getOrRetainProperty(key)
-                return retained === undefined ? undefined : retained.valueOrProxy()
+                return retained === undefined ? 
+                    Reflect.get(...arguments) : retained.valueOrProxy()
         }
     }
 
