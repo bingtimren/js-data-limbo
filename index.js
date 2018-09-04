@@ -24,8 +24,7 @@ class MiddlemanError {
      * @param {*} message 
      * @param {*} error - the underlying error
      */
-    constructor(message, error) {
-    }
+    constructor(message, error) {}
 }
 
 /**
@@ -76,21 +75,21 @@ class MiddlemanHandler {
                 case RETAINED:
                     break // nothing to do
                 case DELETED:
-                    if (Reflect.deleteProperty(this.principal, key)){
+                    if (Reflect.deleteProperty(this.principal, key)) {
                         delete this.keyMap[key] // forget about the actually deleted
                     } else {
-                        throw new MiddlemanError("Commit failed, unable to delete property under '"+key+"'")
+                        throw new MiddlemanError("Commit failed, unable to delete property under '" + key + "'")
                     }
-                    
+
                     break
                 case DIRTY:
                 case NEW:
                     if (Reflect.set(this.principal, key, retainedProperty.principal)) {
                         retainedProperty.propertyState = RETAINED // change has been committed
                     } else {
-                        throw new MiddlemanError("Commit failed, unable to set property under '"+key+"'")
+                        throw new MiddlemanError("Commit failed, unable to set property under '" + key + "'")
                     }
-                    
+
             }
         }
         this.changed = false
@@ -107,14 +106,14 @@ class MiddlemanHandler {
      * @param {string} key 
      */
     getOrRetainProperty(key) {
-        const retainedProp = 
-            this.keyMap.hasOwnProperty(key)?this.keyMap[key]:undefined // would be a proxy
+        const retainedProp =
+            this.keyMap.hasOwnProperty(key) ? this.keyMap[key] : undefined // would be a proxy
         if (retainedProp !== undefined) {
             return retainedProp
         }
         // no knowledge of this property, check from the value
-        let retained = 
-            this.principal.hasOwnProperty(key)?this.principal[key]:undefined
+        let retained =
+            this.principal.hasOwnProperty(key) ? this.principal[key] : undefined
         // if property does not exist, return undefined
         if (retained === undefined) {
             return undefined // has no own key
@@ -130,6 +129,17 @@ class MiddlemanHandler {
         // retain in keyMap
         this.keyMap[key] = newlyRetained
         return newlyRetained
+    }
+    /**
+     * Actually test if the current principal equals the actual property in parent object
+     */
+    testPrincipalEqual() {
+        const parent = this.parentHandler
+        if (parent === undefined) {
+            return true // root cannot be set and therefore always equal
+        }
+        const realProperty = Reflect.get(parent.principal, this.propertyName)
+        return realProperty === this.principal
     }
     /**
      * Proxy handler
@@ -162,6 +172,17 @@ class MiddlemanHandler {
                             targetProp.propertyState : undefined
                     }
                 }(this)
+            case '$testPrincipalEqual':
+                return function (thisHandler) {
+                    return (propertyName) => {
+                        const targetProp =
+                            propertyName ?
+                            thisHandler.getOrRetainProperty(propertyName) :
+                            thisHandler
+                        return targetProp ?
+                            targetProp.testPrincipalEqual() : undefined
+                    }
+                }(this)
             case '$changed':
                 if (typeof target !== 'object' || target === null) {
                     throw TypeError("$changed is only meaningful for a not-null object.")
@@ -173,9 +194,9 @@ class MiddlemanHandler {
                 // a prototype
                 const retained = this.getOrRetainProperty(key)
                 // if there is retained property, return the proxy (if object) or the principal (value)
-                return retained === undefined ? 
-                    Reflect.get(...arguments) : 
-                    (retained.proxy?retained.proxy:retained.principal)
+                return retained === undefined ?
+                    Reflect.get(...arguments) :
+                    (retained.proxy ? retained.proxy : retained.principal)
         }
     }
 

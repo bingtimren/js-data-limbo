@@ -20,12 +20,14 @@ describe("Function middleman", function () {
     })
     function makeSomeChanges(tf) {
         tf.a='AA' // update a property
+        tf.o.n = 43
         tf.x={} // add a property object
         tf.y={null:null} // add a property object with nested properties
         tf.o.z = {name:'bing'} // add nested property
         tf.nn='NNNN' // add a property value
         delete tf.toDelete
         delete tf.o.useless
+        tf.o.n = 42 // change it back
     }
     it("Middleman should be a proxy with basic properties", function(){
         expect(midMan.$isProxy).true
@@ -35,6 +37,11 @@ describe("Function middleman", function () {
         expect(midMan.o.$propertyState()===RETAINED)
         expect(midMan.$propertyState('a')===RETAINED)
         expect(midMan.$changed).false
+        expect(midMan.$testPrincipalEqual()).true
+        expect(midMan.$testPrincipalEqual('a')).true
+        expect(midMan.$testPrincipalEqual('not///exist')).undefined
+        expect(midMan.o.$propertyState('n')).to.equal(RETAINED)
+        expect(midMan.o.$testPrincipalEqual('n')).true
     })
     it("Middleman should look the same as target", function(){
         expect(JSON.stringify(midMan)).to.equal(targetBeforeChange)
@@ -55,6 +62,11 @@ describe("Function middleman", function () {
         expect(midMan.o.$propertyState('useless')).to.equal(DELETED)
         expect(JSON.stringify(midMan)).not.equal(JSON.stringify(target))
         expect(JSON.stringify(target)).to.equal(targetBeforeChange)
+        expect(midMan.$testPrincipalEqual()).true
+        expect(midMan.$testPrincipalEqual('a')).false
+        expect(midMan.$testPrincipalEqual('not///exist')).undefined
+        expect(midMan.o.$propertyState('n')).to.equal(DIRTY)
+        expect(midMan.o.$testPrincipalEqual('n')).true // changed but still equal
         makeSomeChanges(target) // make the same changes
         expect(JSON.stringify(midMan)).to.equal(JSON.stringify(target))
         expect(_.isEqual(midMan, target)).true
@@ -75,6 +87,11 @@ describe("Function middleman", function () {
         expect(midMan.$propertyState('o')).to.equal(RETAINED)
         expect(midMan.$propertyState('toDelete')).to.equal(undefined)
         expect(midMan.o.$propertyState('useless')).to.equal(undefined)
+        expect(midMan.$testPrincipalEqual()).true
+        expect(midMan.$testPrincipalEqual('a')).true
+        expect(midMan.$testPrincipalEqual('not///exist')).undefined
+        expect(midMan.o.$propertyState('n')).to.equal(RETAINED)
+        expect(midMan.o.$testPrincipalEqual('n')).true
 
         const targetJSON = JSON.stringify(target)
         expect(targetJSON).to.equal(midManJSON)

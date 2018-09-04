@@ -1,5 +1,9 @@
 # Change Log
 
+** 0.3.4
+
+Added $testPrincipalEqual() to middleman, added test case and passed.
+
 ** 0.3.3
 Added property status tests after commit.
 Fixed commit() logic, to restore property state to RETAINED and object not CHANGED.
