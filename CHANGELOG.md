@@ -1,5 +1,13 @@
 # Change Log
 
+** 0.3.3
+Added property status tests after commit.
+Fixed commit() logic, to restore property state to RETAINED and object not CHANGED.
+
+** 0.3.2 Sep 4, 2018
+Added lodash _.isEqual deep equal test.
+Fixed a bug by checking if a key is object's own key.
+
 ** 0.2.0 Aug 30, 2018
 Implemented & tested handler functions:
 - get

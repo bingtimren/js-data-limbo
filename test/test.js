@@ -63,6 +63,19 @@ describe("Function middleman", function () {
         makeSomeChanges(midMan)
         const midManJSON = JSON.stringify(midMan)
         midMan.$commit()
+        // after commit, every thing should be RETAINED again
+        expect(midMan.$changed).false
+        expect(midMan.o.$changed).false
+        expect(midMan.$propertyState('a')).to.equal(RETAINED)
+        expect(midMan.$propertyState('x')).to.equal(RETAINED)
+        expect(midMan.x.$propertyState()).to.equal(RETAINED)
+        expect(midMan.$propertyState('y')).to.equal(RETAINED)
+        expect(midMan.y.$propertyState()).to.equal(RETAINED)
+        expect(midMan.o.$propertyState()).to.equal(RETAINED)
+        expect(midMan.$propertyState('o')).to.equal(RETAINED)
+        expect(midMan.$propertyState('toDelete')).to.equal(undefined)
+        expect(midMan.o.$propertyState('useless')).to.equal(undefined)
+
         const targetJSON = JSON.stringify(target)
         expect(targetJSON).to.equal(midManJSON)
         expect(_.isEqual(midMan, target)).true

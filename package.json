@@ -1,6 +1,6 @@
 {
   "name": "data-limbo",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "A data middleman serve Proxy between user (a UI component) and a data source (Vuex store, or just an object), retain and validate data before committing the changes to the data store",
   "main": "index.js",
   "scripts": {

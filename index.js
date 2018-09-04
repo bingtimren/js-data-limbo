@@ -18,6 +18,16 @@ const NEW = 'NEW'
 const RETAINED = 'RETAINED'
 const DELETED = 'DELETED'
 
+class MiddlemanError {
+    /**
+     * Construct an instance
+     * @param {*} message 
+     * @param {*} error - the underlying error
+     */
+    constructor(message, error) {
+    }
+}
+
 /**
  * Proxy handler class, attach a new instance for each value
  */
@@ -38,7 +48,7 @@ class MiddlemanHandler {
             throw "parent cannot be this"
         }
         this.keyMap = {} // key : property's Proxy
-        this.value = value
+        this.principal = value
         this.proxy = (typeof value === 'object' && value !== null) ?
             new Proxy(value, this) : undefined
 
@@ -50,7 +60,7 @@ class MiddlemanHandler {
     }
 
     commit() {
-        if (typeof this.value !== 'object') {
+        if (typeof this.principal !== 'object') {
             throw TypeError("Commit can only be called on the proxy of an object")
         }
         // commit changes to the value
@@ -66,21 +76,28 @@ class MiddlemanHandler {
                 case RETAINED:
                     break // nothing to do
                 case DELETED:
-                    Reflect.deleteProperty(this.value, key)
+                    if (Reflect.deleteProperty(this.principal, key)){
+                        delete this.keyMap[key] // forget about the actually deleted
+                    } else {
+                        throw new MiddlemanError("Commit failed, unable to delete property under '"+key+"'")
+                    }
+                    
                     break
                 case DIRTY:
                 case NEW:
-                    Reflect.set(this.value, key, retainedProperty.value)
+                    if (Reflect.set(this.principal, key, retainedProperty.principal)) {
+                        retainedProperty.propertyState = RETAINED // change has been committed
+                    } else {
+                        throw new MiddlemanError("Commit failed, unable to set property under '"+key+"'")
+                    }
+                    
             }
         }
-    }
-
-    valueOrProxy() {
-        return this.proxy === undefined ? this.value : this.proxy
+        this.changed = false
     }
 
     assertAttachment(target) {
-        if (target !== this.value || (typeof target !== 'object')) {
+        if (target !== this.principal || (typeof target !== 'object')) {
             throw TypeError("ERROR: MiddlemanHandler can only be used to its value!")
         }
     }
@@ -97,16 +114,16 @@ class MiddlemanHandler {
         }
         // no knowledge of this property, check from the value
         let retained = 
-            this.value.hasOwnProperty(key)?this.value[key]:undefined
+            this.principal.hasOwnProperty(key)?this.principal[key]:undefined
         // if property does not exist, return undefined
         if (retained === undefined) {
             return undefined // has no own key
         }
         // obtain a descriptor
-        const descriptor = Reflect.getOwnPropertyDescriptor(this.value, key)
+        const descriptor = Reflect.getOwnPropertyDescriptor(this.principal, key)
         // property exists, obtain the property descriptor
         if (descriptor) {
-            delete descriptor.value
+            delete descriptor.principal
         }
         // create a RETAINED property proxy
         let newlyRetained = new MiddlemanHandler(retained, this, key, RETAINED, descriptor)
@@ -129,7 +146,7 @@ class MiddlemanHandler {
             case '$proxyKeyMap':
                 return this.keyMap
             case '$principal':
-                return this.value
+                return this.principal
             case '$commit':
                 return () => {
                     this.commit()
@@ -155,8 +172,10 @@ class MiddlemanHandler {
                 // otherwise fallback since there still might be result from
                 // a prototype
                 const retained = this.getOrRetainProperty(key)
+                // if there is retained property, return the proxy (if object) or the principal (value)
                 return retained === undefined ? 
-                    Reflect.get(...arguments) : retained.valueOrProxy()
+                    Reflect.get(...arguments) : 
+                    (retained.proxy?retained.proxy:retained.principal)
         }
     }
 
@@ -198,7 +217,7 @@ class MiddlemanHandler {
         }
         // mark deleted without actually delete
         handler.keyMap = {}
-        handler.value = undefined
+        handler.principal = undefined
         handler.proxy = undefined
         handler.propertyState = DELETED
         handler.changed = false // undefined is not a changed object
